@@ -155,4 +155,8 @@ Contributions are welcome! Please open an issue or submit a pull request.
 ## License
 This project is licensed under the MIT License.
 
-## This project is fully made by pankil soni: https://github.com/pankil-soni
+## About the Author 📝
+This project was developed by **Pankil Soni**. Feel free to reach out with any questions or suggestions.
+- gmail - pmsoni2016@gmail.com
+- kaggle - https://www.kaggle.com/pankilsoni
+- LinkedIn - https://www.linkedin.com/in/pankil-soni-5a0541170/
