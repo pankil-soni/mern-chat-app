@@ -4,11 +4,15 @@
 
 A full-stack MERN (MongoDB, Express.js, React.js, Node.js) chat application with Personal Chatbot. Conversa is a chat-app with various features like personalized chatbot which remembers the context, login, signup, profile photo uploading, dark and light mode, real-time chatting, message notifications, typing animation, message deletion, active/online status tracking, message seen status, and sending image messages with captions.
 
+NOTE!!! if you want to use the given website please wait for 1 minute after logging in for the first time for the backend server to get restarted as it is a free server.
+
 Guest User login accounts:
 ```
 username : guestuser1@gmail.com, guestuser2@gmail.com
 password: 1234guest
 ```
+
+
 
 ## Table of Contents
 
