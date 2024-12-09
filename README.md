@@ -136,8 +136,17 @@ password: 1234guest
 3. Create a .env file in the backend folder and add necessary environment variables:
     ```
     PORT=5000
-    MONGODB_URI=your_mongodb_uri
-    SECRET_KEY=your_secret_key
+    GENERATIVE_API_KEY = ""
+    MONGO_URI = ""
+    EMAIL = ""
+    PASSWORD= ""
+    CLOUDINARY_ClOUD_NAME = ""
+    CLOUDINARY_API_KEY = ""
+    CLOUDINARY_API_SECRET = ""
+    JWT_SECRET = ""
+    AWS_ACCESS_KEY = ""
+    AWS_SECRET = ""
+    AWS_BUCKET_NAME = ""
     ```
 
 ## Usage
