@@ -29,6 +29,7 @@ const CFaLock = chakra(FaLock);
 
 const Login = (props) => {
   const context = useContext(chatContext);
+  const { hostName, socket, setUser, setIsAuthenticated, fetchData } = context;
   const toast = useToast();
   const navigator = useNavigate();
 
@@ -67,7 +68,7 @@ const Login = (props) => {
     }
 
     try {
-      const response = await fetch(`${context.ipadd}/user/login`, {
+      const response = await fetch(`${hostName}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -83,11 +84,10 @@ const Login = (props) => {
         showtoast("Login successful", "You are now logged in", "success");
 
         localStorage.setItem("token", resdata.authtoken);
-        context.setuser(await resdata.user);
-        context.socket.emit("setup", await resdata.user._id);
-        console.log("setup reques sent for", await resdata.user._id);
-        context.setisauthenticated(true);
-        context.fetchData();
+        setUser(await resdata.user);
+        socket.emit("setup", await resdata.user._id);
+        setIsAuthenticated(true);
+        fetchData();
         navigator("/dashboard");
       }
     } catch (error) {
@@ -104,7 +104,7 @@ const Login = (props) => {
     };
 
     try {
-      const response = await fetch(`${context.ipadd}/user/getotp`, {
+      const response = await fetch(`${hostName}/auth/getotp`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

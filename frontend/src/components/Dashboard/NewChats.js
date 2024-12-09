@@ -22,12 +22,21 @@ import chatContext from "../../context/chatContext";
 
 const NewChats = (props) => {
   const [data, setData] = useState([]);
-  const [users, setusers] = useState(data);
+  const [users, setUsers] = useState(data);
   const context = useContext(chatContext);
+  const {
+    hostName,
+    socket,
+    user,
+    myChatList,
+    setMyChatList,
+    setReceiver,
+    setActiveChatId,
+  } = context;
 
-  const fetchData = async () => {
+  const fetchNonFriendsList = async () => {
     try {
-      const response = await fetch(`${context.ipadd}/user/`, {
+      const response = await fetch(`${hostName}/user/non-friends`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -39,71 +48,62 @@ const NewChats = (props) => {
       }
       const jsonData = await response.json();
       setData(jsonData);
-      setusers(jsonData);
-
-      const receivers = await context.mychatList.map((chat) => {
-        return chat.members[0]._id;
-      });
-
-      const newusers = await jsonData.filter((user) => {
-        if (!receivers.includes(user._id)) {
-          return user;
-        }
-      });
-      setData(newusers);
-      setusers(newusers);
+      setUsers(jsonData);
     } catch (error) {
-      // setError(error);
+      console.log(error);
     }
   };
 
   useEffect(() => {
-    return () => {
-      fetchData();
-    };
-  }, [context.mychatList]);
+    async function fetchList() {
+      await fetchNonFriendsList();
+    }
+    fetchList();
+  }, [myChatList]);
 
   const handleUserSearch = async (e) => {
     if (e.target.value !== "") {
-      const newusers = data.filter((user) => {
-        if (user.name.toLowerCase().includes(e.target.value.toLowerCase())) {
-          return user;
-        }
-      });
-      setusers(newusers);
+      const newusers = data.filter((user) =>
+        user.name.toLowerCase().includes(e.target.value.toLowerCase())
+      );
+      setUsers(newusers);
     } else {
-      setusers(data);
+      setUsers(data);
     }
   };
 
-  const handleNewChat = (e, receiverid) => {
+  const handleNewChat = async (e, receiverid) => {
     e.preventDefault();
-    const data = { members: [context.user._id, receiverid] };
-    fetch(`${context.ipadd}/conversation/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "auth-token": localStorage.getItem("token"),
-      },
-      body: JSON.stringify(data),
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        props.setactiveTab(0);
-        context.setactiveChat(data._id);
-        context.setreceiver(data.members[0]);
-        context.setmychatList([data, ...context.mychatList]);
-        context.socket.emit("join-chat", {
-          room: data._id,
-          user: context.user._id,
-        });
-        //remove receiver from users
-        const newusers = users.filter((user) => user._id !== receiverid);
-        setusers(newusers);
-      })
-      .catch((error) => {
-        console.error("Error:", error);
+    const payload = { members: [user._id, receiverid] };
+    try {
+      const response = await fetch(`${hostName}/conversation/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "auth-token": localStorage.getItem("token"),
+        },
+        body: JSON.stringify(payload),
       });
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch data");
+      }
+      const data = await response.json();
+
+      setMyChatList([data, ...myChatList]);
+      setReceiver(data.members[0]);
+      setActiveChatId(data._id);
+      props.setactiveTab(0);
+
+      socket.emit("join-chat", {
+        roomId: data._id,
+        userId: user._id,
+      });
+
+      setUsers((users) => users.filter((user) => user._id !== receiverid));
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   return (

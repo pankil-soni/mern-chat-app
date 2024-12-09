@@ -1,45 +1,28 @@
-import React, { useState } from "react";
-import {
-  ArrowForwardIcon,
-  CheckCircleIcon,
-  CopyIcon,
-  DeleteIcon,
-} from "@chakra-ui/icons";
+import React, { useState, useEffect, useContext } from "react";
+import { ArrowForwardIcon } from "@chakra-ui/icons";
 import Lottie from "react-lottie";
 import animationdata from "../../typingAnimation.json";
 import {
   Box,
-  Image,
   InputGroup,
   Input,
   Text,
   InputRightElement,
   Button,
   FormControl,
-  Flex,
-  Tooltip,
   InputLeftElement,
-  Circle,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  PopoverArrow,
-  PopoverCloseButton,
-  PopoverHeader,
-  PopoverBody,
-  Stack,
+  useToast,
+  useDisclosure,
 } from "@chakra-ui/react";
-import ChatAreaTop from "./ChatAreaTop";
-import { useContext } from "react";
-import chatContext from "../../context/chatContext";
-import { useToast } from "@chakra-ui/react";
-import { useEffect } from "react";
-import { marked } from "marked";
 import { FaFileUpload } from "react-icons/fa";
-import { useDisclosure } from "@chakra-ui/react";
+import { marked } from "marked";
+
+import chatContext from "../../context/chatContext";
+import ChatAreaTop from "./ChatAreaTop";
 import FileUploadModal from "../miscellaneous/FileUploadModal";
 import ChatLoadingSpinner from "../miscellaneous/ChatLoadingSpinner";
-import DeleteMessageModal from "../miscellaneous/DeleteMessageModal";
+import axios from "axios";
+import SingleMessage from "./SingleMessage";
 
 const scrollbarconfig = {
   "&::-webkit-scrollbar": {
@@ -65,18 +48,27 @@ const markdownToHtml = (markdownText) => {
 
 export const ChatArea = () => {
   const context = useContext(chatContext);
-  const [showDelete, setshowDelete] = useState(false);
-  const [selectedMessage, setselectedMessage] = useState("");
+  const {
+    hostName,
+    user,
+    receiver,
+    socket,
+    activeChatId,
+    messageList,
+    setMessageList,
+    isOtherUserTyping,
+    setIsOtherUserTyping,
+    setActiveChatId,
+    setReceiver,
+    setMyChatList,
+    myChatList,
+    isChatLoading,
+  } = context;
   const [typing, settyping] = useState(false);
-
+  const toast = useToast();
   const { isOpen, onOpen, onClose } = useDisclosure();
 
-  const {
-    isOpen: isopendelete,
-    onOpen: onOpendelete,
-    onClose: onclosedelete,
-  } = useDisclosure();
-
+  // Lottie Options for typing
   const defaultOptions = {
     loop: true,
     autoplay: true,
@@ -89,48 +81,44 @@ export const ChatArea = () => {
   useEffect(() => {
     return () => {
       window.addEventListener("popstate", () => {
-        context.socket.emit("leave-chat", context.activeChat);
-        context.setactiveChat("");
-        context.setmessageList([]);
-        context.setreceiver({});
+        socket.emit("leave-chat", activeChatId);
+        setActiveChatId("");
+        setMessageList([]);
+        setReceiver({});
       });
     };
-  });
+  }, [socket, activeChatId, setActiveChatId, setMessageList, setReceiver]);
 
   useEffect(() => {
-    context.socket.on("user-joined-room", async (userid) => {
-      var messagelist = context.messageList.map((message) => {
-        if (message.sender === context.user._id) {
-          if (message.seenby) {
-            message.seenby.push(userid);
-          } else {
-            message.seenby = [userid];
+    socket.on("user-joined-room", (userId) => {
+      const updatedList = messageList.map((message) => {
+        if (message.senderId === user._id && userId !== user._id) {
+          const index = message.seenBy.findIndex(
+            (seen) => seen.user === userId
+          );
+          if (index === -1) {
+            message.seenBy.push({ user: userId, seenAt: new Date() });
           }
         }
         return message;
       });
-      console.log(messagelist);
-      context.setmessageList(messagelist);
+      setMessageList(updatedList);
     });
 
-    context.socket.on("typing", (data) => {
-      console.log(data.typer);
-      console.log(context.user._id);
-      console.log(data.typer === context.user._id);
-      if (data.typer !== context.user._id) {
-        context.setotherusertyping(true);
+    socket.on("typing", (data) => {
+      if (data.typer !== user._id) {
+        setIsOtherUserTyping(true);
       }
     });
 
-    context.socket.on("stop-typing", (data) => {
-      if (data.typer !== context.user._id) {
-        context.setotherusertyping(false);
+    socket.on("stop-typing", (data) => {
+      if (data.typer !== user._id) {
+        setIsOtherUserTyping(false);
       }
     });
 
-    context.socket.on("receive-message", async (data) => {
-      context.setmessageList([...context.messageList, data.data]);
-
+    socket.on("receive-message", (data) => {
+      setMessageList((prev) => [...prev, data]);
       setTimeout(() => {
         document.getElementById("chat-box")?.scrollTo({
           top: document.getElementById("chat-box").scrollHeight,
@@ -139,32 +127,37 @@ export const ChatArea = () => {
       }, 100);
     });
 
+    socket.on("message-deleted", (data) => {
+      const { messageId } = data;
+      setMessageList((prev) => prev.filter((msg) => msg._id !== messageId));
+    });
+
     return () => {
-      context.socket.off("typing");
-      context.socket.off("stop-typing");
-      context.socket.off("receive-message");
+      socket.off("typing");
+      socket.off("stop-typing");
+      socket.off("receive-message");
+      socket.off("message-deleted");
     };
-  });
+  }, [socket, messageList, setMessageList, user._id, setIsOtherUserTyping]);
 
-  const toast = useToast();
+  const handleTyping = () => {
+    const messageInput = document.getElementById("new-message");
+    if (!messageInput) return;
 
-  const handleTyping = (e) => {
-    if (document.getElementById("new-message").value === "" && typing) {
+    if (messageInput.value === "" && typing) {
       settyping(false);
-      context.socket.emit("stop-typing", {
-        typer: context.user._id,
-        conversationId: context.activeChat,
+      socket.emit("stop-typing", {
+        typer: user._id,
+        conversationId: activeChatId,
       });
-    } else {
+    } else if (messageInput.value !== "" && !typing) {
       settyping(true);
-      context.socket.emit("typing", {
-        typer: context.user._id,
-        conversationId: context.activeChat,
+      socket.emit("typing", {
+        typer: user._id,
+        conversationId: activeChatId,
       });
     }
   };
-
-  var messages = context.messageList;
 
   const handleKeyPress = (e) => {
     if (e.key === "Enter") {
@@ -172,89 +165,115 @@ export const ChatArea = () => {
     }
   };
 
-  const handleRightClick = (e, messageid) => {
-    e.preventDefault();
-    setshowDelete(true);
-    setselectedMessage(messageid);
+  const getPreSignedUrl = async (fileName, fileType) => {
+    if (!fileName || !fileType) return;
+    try {
+      const response = await fetch(
+        `${hostName}/user/presigned-url?filename=${fileName}&filetype=${fileType}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "auth-token": localStorage.getItem("token"),
+          },
+        }
+      );
 
-    document.addEventListener("click", () => {
-      setshowDelete(false);
-    });
+      if (!response.ok) {
+        throw new Error("Failed to get pre-signed URL");
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      toast({
+        title: error.message,
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
   };
 
   const handleSendMessage = async (e, messageText, file) => {
     e.preventDefault();
-
-    context.setmessageseen(false);
+    const awsHost = "https://conversa-chat.s3.ap-south-1.amazonaws.com/";
 
     if (!messageText) {
-      messageText = document.getElementById("new-message").value;
+      messageText = document.getElementById("new-message")?.value || "";
     }
 
-    context.socket.emit("stop-typing", {
-      typer: context.user._id,
-      conversationId: context.activeChat,
+    socket.emit("stop-typing", {
+      typer: user._id,
+      conversationId: activeChatId,
     });
 
-    if (messageText === "") {
+    if (messageText === "" && !file) {
       toast({
         title: "Message cannot be empty",
         status: "warning",
         duration: 3000,
         isClosable: true,
       });
-    } else {
-      const formData = new FormData();
-
-      const data = {
-        text: messageText,
-        conversationId: context.activeChat,
-        sender: context.user._id,
-        createdAt: new Date().toUTCString(),
-        _id: context.user._id + "" + Date.now(),
-      };
-
-      if (file) {
-        formData.append("file", file);
-        data.imageurl = URL.createObjectURL(file);
-      }
-      formData.append("text", messageText);
-      formData.append("conversationId", context.activeChat);
-      formData.append("sender", context.user._id);
-      formData.append("createdAt", new Date().toUTCString());
-      formData.append("_id", context.user._id + "" + Date.now());
-
-      fetch(`${context.ipadd}/message/send`, {
-        method: "POST",
-        headers: {
-          "auth-token": localStorage.getItem("token"),
-        },
-        body: formData,
-      });
-
-      context.socket.emit("send-message", {
-        data,
-      });
-
-      document.getElementById("new-message").value = "";
-
-      setTimeout(() => {
-        document.getElementById("chat-box")?.scrollTo({
-          top: document.getElementById("chat-box").scrollHeight,
-          behavior: "smooth",
-        });
-      }, 100);
+      return;
     }
 
-    //move active chat to top in context.mychatList
+    let key;
+    if (file) {
+      try {
+        const { url, fields } = await getPreSignedUrl(file.name, file.type);
+        const formData = new FormData();
+        Object.entries({ ...fields, file }).forEach(([k, v]) => {
+          formData.append(k, v);
+        });
 
-    context.setmychatList(
-      await context.mychatList
+        const response = await axios.post(url, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+
+        if (response.status !== 201) {
+          throw new Error("Failed to upload file");
+        }
+
+        key = fields.key;
+      } catch (error) {
+        toast({
+          title: error.message,
+          status: "error",
+          duration: 3000,
+          isClosable: true,
+        });
+        return;
+      }
+    }
+
+    const data = {
+      text: messageText,
+      conversationId: activeChatId,
+      senderId: user._id,
+      imageUrl: file ? `${awsHost}${key}` : null,
+    };
+
+    socket.emit("send-message", data);
+
+    const inputElem = document.getElementById("new-message");
+    if (inputElem) {
+      inputElem.value = "";
+    }
+
+    setTimeout(() => {
+      document.getElementById("chat-box")?.scrollTo({
+        top: document.getElementById("chat-box").scrollHeight,
+        behavior: "smooth",
+      });
+    }, 100);
+
+    setMyChatList(
+      await myChatList
         .map((chat) => {
-          if (chat._id === context.activeChat) {
+          if (chat._id === activeChatId) {
             chat.latestmessage = messageText;
             chat.updatedAt = new Date().toUTCString();
-            console.log(chat);
           }
           return chat;
         })
@@ -262,244 +281,55 @@ export const ChatArea = () => {
     );
   };
 
-  const handleDeleteMessage = async (deletefrom) => {
-    var messagelist = context.messageList.filter(
-      (message) => message._id !== selectedMessage
-    );
-    context.setmessageList(messagelist);
-    setshowDelete(false);
-    onclosedelete();
-
-    const userids = [];
-    userids.push(context.user._id);
-    if (deletefrom == 2) {
-      userids.push(context.receiver._id);
-    }
-
-    const data = {
-      messageid: selectedMessage,
-      userids,
-    };
-
-    console.log(data);
-
-    fetch(`${context.ipadd}/message/delete`, {
-      method: "POST",
-      headers: {
-        "auth-token": localStorage.getItem("token"),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
+  const removeMessageFromList = (messageId) => {
+    setMessageList((prev) => prev.filter((msg) => msg._id !== messageId));
   };
 
   return (
     <>
-      {context.activeChat !== "" ? (
+      {activeChatId !== "" ? (
         <>
           <Box
-            // display={"flex"}
-            // flexDir="column"
             justifyContent="space-between"
-            h={"100%"}
+            h="100%"
             w={{
               base: "100vw",
               md: "100%",
             }}
           >
             <ChatAreaTop />
-            {context.ischatLoading && <ChatLoadingSpinner />}
 
-            <DeleteMessageModal
-              isOpen={isopendelete}
-              handleDeleteMessage={handleDeleteMessage}
-              onClose={onclosedelete}
-            />
+            {isChatLoading && <ChatLoadingSpinner />}
 
             <Box
               id="chat-box"
-              h={"85%"}
-              // flex={1}
+              h="85%"
               overflowY="auto"
               sx={scrollbarconfig}
               mt={1}
               mx={1}
             >
-              {messages?.map(
-                (message) =>
-                  !message.deletedby?.includes(context.user._id) && (
-                    <Flex
-                      justify={
-                        message.sender === context.user._id ? "end" : "start"
-                      }
-                      mx={2}
-                      key={message._id}
-                      onContextMenu={(e) =>
-                        message.sender === context.user._id
-                          ? handleRightClick(e, message._id)
-                          : null
-                      }
-
-                      //onlong press
-                    >
-                      <Flex w={"max-content"}>
-                        {showDelete && message._id === selectedMessage && (
-                          <Box my={3}>
-                            <Button
-                              onClick={function (e) {
-                                e.preventDefault();
-                                onOpendelete();
-                              }}
-                              mr={2}
-                            >
-                              <DeleteIcon />
-                            </Button>
-                            <Tooltip label="copy">
-                              <Button
-                                mr={2}
-                                onClick={() =>
-                                  toast({
-                                    duration: 1000,
-                                    render: () => (
-                                      <Box
-                                        color="white"
-                                        p={3}
-                                        bg="purple.300"
-                                        borderRadius={"lg"}
-                                      >
-                                        Message copied to clipboard!!
-                                      </Box>
-                                    ),
-                                  }) ||
-                                  navigator.clipboard.writeText(message.text)
-                                }
-                              >
-                                <CopyIcon />
-                              </Button>
-                            </Tooltip>
-                          </Box>
-                        )}
-
-                        {message.sender !== context.user._id && (
-                          <Image
-                            borderRadius={"50%"}
-                            src={context.receiver.profilePic}
-                            alt="Sender"
-                            w={"20px"}
-                            h={"20px"}
-                            mr={1}
-                            alignSelf={"center"}
-                          />
-                        )}
-                        <Stack spacing={0}>
-                          {message.replyto && (
-                            <Box
-                              my={1}
-                              p={2}
-                              borderRadius={10}
-                              bg={
-                                message.sender === context.user._id
-                                  ? "purple.200"
-                                  : "blue.200"
-                              }
-                              mx={2}
-                              color="white"
-                              w={"max-content"}
-                              maxW={"60vw"}
-                              alignSelf={
-                                message.sender === context.user._id
-                                  ? "flex-end"
-                                  : "flex-start"
-                              }
-                            >
-                              reply to
-                            </Box>
-                          )}
-                          <Box
-                            alignSelf={
-                              message.sender === context.user._id
-                                ? "flex-end"
-                                : "flex-start"
-                            }
-                            position={"relative"}
-                            my={1}
-                            p={2}
-                            borderRadius={10}
-                            bg={
-                              message.sender === context.user._id
-                                ? "purple.300"
-                                : "blue.300"
-                            }
-                            color="white"
-                            w={"max-content"}
-                            maxW={"60vw"}
-                          >
-                            {message.imageurl && (
-                              <Image
-                                src={message.imageurl}
-                                alt="loading..."
-                                w={"200px"}
-                                maxW={"40vw"}
-                                borderRadius={"10px"}
-                                mb={2}
-                              />
-                            )}
-                            <Text
-                              overflowX={"scroll"}
-                              sx={scrollbarconfig}
-                              dangerouslySetInnerHTML={markdownToHtml(
-                                message?.text
-                              )}
-                            ></Text>
-                            <Flex justify={"end"}>
-                              <Text
-                                align={"end"}
-                                fontSize={"10px"}
-                                color={"#e6e5e5"}
-                              >{`${new Date(
-                                message.createdAt
-                              ).getHours()}:${new Date(
-                                message.createdAt
-                              ).getMinutes()}`}</Text>
-
-                              {message.sender === context.user._id &&
-                                message.seenby?.includes(
-                                  context.receiver._id
-                                ) && (
-                                  <Circle
-                                    ml={1}
-                                    fontSize={"x-small"}
-                                    color={"green.100"}
-                                  >
-                                    <CheckCircleIcon />
-                                  </Circle>
-                                )}
-                            </Flex>
-                            <Box
-                              fontSize={"xs"}
-                              position={"absolute"}
-                              bg={
-                                message.sender === context.user._id
-                                  ? "purple.300"
-                                  : "blue.300"
-                              }
-                              bottom={-1}
-                              left={-1}
-                              borderRadius={"lg"}
-                            >
-                              {message.reaction}
-                            </Box>
-                          </Box>
-                        </Stack>
-                      </Flex>
-                    </Flex>
-                  )
+              {messageList?.map((message) =>
+                !message.deletedby?.includes(user._id) ? (
+                  <SingleMessage
+                    key={message._id}
+                    message={message}
+                    user={user}
+                    receiver={receiver}
+                    markdownToHtml={markdownToHtml}
+                    scrollbarconfig={scrollbarconfig}
+                    socket={socket}
+                    activeChatId={activeChatId}
+                    removeMessageFromList={removeMessageFromList}
+                    toast={toast}
+                  />
+                ) : null
               )}
             </Box>
 
             <Box
               py={2}
-              position={"fixed"}
+              position="fixed"
               w={{
                 base: "100%",
                 md: "70%",
@@ -519,9 +349,9 @@ export const ChatArea = () => {
                   base: 6,
                   md: 3,
                 }}
-                w={"fit-content"}
+                w="fit-content"
               >
-                {context.otherusertyping && (
+                {isOtherUserTyping && (
                   <Lottie
                     options={defaultOptions}
                     height={20}
@@ -537,16 +367,16 @@ export const ChatArea = () => {
                     base: "95%",
                     md: "98%",
                   }}
-                  m={"auto"}
-                  onKeyDown={(e) => handleKeyPress(e)}
+                  m="auto"
+                  onKeyDown={handleKeyPress}
                 >
-                  {!context.receiver?.email?.includes("bot") && (
+                  {!receiver?.email?.includes("bot") && (
                     <InputLeftElement>
                       <Button
                         mx={2}
-                        size={"sm"}
+                        size="sm"
                         onClick={onOpen}
-                        borderRadius={"lg"}
+                        borderRadius="lg"
                       >
                         <FaFileUpload />
                       </Button>
@@ -555,9 +385,9 @@ export const ChatArea = () => {
 
                   <Input
                     placeholder="Type a message"
-                    id={"new-message"}
-                    onChange={(e) => handleTyping(e)}
-                    borderRadius={"10px"}
+                    id="new-message"
+                    onChange={handleTyping}
+                    borderRadius="10px"
                   />
 
                   <InputRightElement>
@@ -565,12 +395,12 @@ export const ChatArea = () => {
                       onClick={(e) =>
                         handleSendMessage(
                           e,
-                          document.getElementById("new-message").value
+                          document.getElementById("new-message")?.value
                         )
                       }
-                      size={"sm"}
+                      size="sm"
                       mx={2}
-                      borderRadius={"10px"}
+                      borderRadius="10px"
                     >
                       <ArrowForwardIcon />
                     </Button>
@@ -586,23 +416,22 @@ export const ChatArea = () => {
           />
         </>
       ) : (
-        !context.ischatLoading && (
+        !isChatLoading && (
           <Box
             display={{
               base: "none",
               md: "block",
             }}
-            mx={"auto"}
-            w={"fit-content"}
-            mt={"30vh"}
-            h={"max-content"}
-            textAlign={"center"}
+            mx="auto"
+            w="fit-content"
+            mt="30vh"
+            textAlign="center"
           >
-            <Text fontSize={"6vw"} fontWeight={"bold"} fontFamily={"Work sans"}>
+            <Text fontSize="6vw" fontWeight="bold" fontFamily="Work sans">
               Conversa
             </Text>
-            <Text fontSize={"2vw"}>Online chatting app</Text>
-            <Text fontSize={"md"}>Select a chat to start messaging</Text>
+            <Text fontSize="2vw">Online chatting app</Text>
+            <Text fontSize="md">Select a chat to start messaging</Text>
           </Box>
         )
       )}

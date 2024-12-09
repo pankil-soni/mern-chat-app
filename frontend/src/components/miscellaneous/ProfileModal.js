@@ -25,29 +25,34 @@ import chatContext from "../../context/chatContext";
 import _isEqual from "lodash/isEqual";
 import { useToast } from "@chakra-ui/react";
 
-export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
+export const ProfileModal = ({ isOpen, onClose, user, setUser }) => {
   const context = useContext(chatContext);
+  const { hostName } = context;
   const [editing, setEditing] = useState(false);
   const [editedUser, setEditedUser] = useState(user);
   const [showEditIcon, setShowEditIcon] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showchangepassword, setshowchangepassword] = useState(false);
+
   const toast = useToast();
 
-  // If user is not defined then wait for the user to be fetched
+  // if user is not defined then wait for the user to be fetched
   useEffect(() => {
     if (!_isEqual(user, editedUser)) {
       setEditedUser(user);
     }
   }, [user]);
 
-  // Function to handle saving changes
   const handleSave = async () => {
     try {
-      setuser(editedUser);
-      context.setuser(editedUser);
+      setUser(editedUser);
+    } catch (error) {}
 
-      // Send the updated user to the server
-      const response = await fetch(`${context.ipadd}/user/update`, {
+    context.setUser(editedUser);
+
+    // send the updated user to the server
+
+    try {
+      const response = await fetch(`${hostName}/user/update`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -81,23 +86,19 @@ export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
     }
   };
 
-  // Function to handle edit mode
   const handleEdit = () => {
     setEditing(true);
   };
 
-  // Function to handle input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setEditedUser({ ...editedUser, [name]: value });
   };
 
-  // Function to handle mouse over
   const handleMouseOver = () => {
     setShowEditIcon(true);
   };
 
-  // Function to handle mouse out
   const handleMouseOut = () => {
     setShowEditIcon(false);
   };
@@ -111,7 +112,6 @@ export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
             <Text fontSize="xl" fontWeight="bold">
               Profile
             </Text>
-            {/* Edit icon */}
             <IconButton
               aria-label="Edit profile"
               icon={<EditIcon />}
@@ -131,28 +131,22 @@ export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
             onChange={(index) => setEditing(index === 1)}
           >
             <TabPanels>
-              {/* Tab panel for displaying user profile */}
               <TabPanel>
                 <Stack spacing={2}>
-                  {/* User profile picture */}
                   <Image
                     borderRadius="full"
                     boxSize={{ base: "100px", md: "150px" }}
                     src={user.profilePic}
-                    alt="Profile Picture"
+                    alt="Dan Abramov"
                     mx="auto"
                   />
-                  {/* User name */}
                   <Text fontSize="xx-large" fontWeight="bold">
                     {user.name}
                   </Text>
-                  {/* User about */}
                   <Text fontSize="md">About: {user.about}</Text>
-                  {/* User email */}
-                  <Text fontSize="md">Email: {user.email}</Text>
+                  <Text fontSize="md">email: {user.email}</Text>
                 </Stack>
               </TabPanel>
-              {/* Tab panel for editing profile */}
               <TabPanel>
                 <Stack spacing={4}>
                   <Circle
@@ -167,10 +161,9 @@ export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
                       borderRadius="full"
                       boxSize={{ base: "100px", md: "150px" }}
                       src={user.profilePic}
-                      alt="Profile Picture"
+                      alt="profile-pic"
                       mx="auto"
                     />
-                    {/* Edit icon */}
                     {showEditIcon && (
                       <Box
                         textAlign={"center"}
@@ -182,11 +175,10 @@ export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
                           aria-label="Edit profile picture"
                           icon={<EditIcon />}
                         ></IconButton>
-                        <Text fontSize={"xx-small"}>Click to edit profile</Text>
+                        <Text fontSize={"xx-small"}>click to edit profile</Text>
                       </Box>
                     )}
                   </Circle>
-                  {/* Input fields for editing profile */}
                   <Input
                     name="name"
                     placeholder="Name"
@@ -195,34 +187,32 @@ export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
                   />
                   <Input
                     name="about"
-                    placeholder="About"
+                    placeholder="about"
                     value={editedUser.about}
                     onChange={handleChange}
                   />
-                  {/* Button to toggle change password */}
                   <Button
-                    onClick={() => setShowChangePassword(!showChangePassword)}
+                    onClick={() => setshowchangepassword(!showchangepassword)}
                   >
-                    Change Password{" "}
-                    {showChangePassword ? (
+                    change my password{" "}
+                    {showchangepassword ? (
                       <ChevronUpIcon />
                     ) : (
                       <ChevronDownIcon />
                     )}
                   </Button>
-                  {/* Change password fields */}
-                  {showChangePassword && (
+                  {showchangepassword && (
                     <Box>
                       <Input
-                        name="oldPassword"
-                        placeholder="Old Password"
+                        name="oldpassword"
+                        placeholder="old password"
                         type="password"
                         onChange={handleChange}
                         mb={2}
                       />
                       <Input
-                        name="newPassword"
-                        placeholder="New Password"
+                        name="newpassword"
+                        placeholder="new password"
                         type="password"
                         onChange={handleChange}
                       />
@@ -233,15 +223,12 @@ export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
             </TabPanels>
           </Tabs>
         </ModalBody>
-        {/* Footer for Save/Cancel buttons */}
         <ModalFooter>
-          {/* Save button */}
           {editing ? (
             <Button colorScheme="purple" mr={3} onClick={handleSave}>
               Save
             </Button>
           ) : (
-            // Edit button
             <Button
               colorScheme="purple"
               display={user._id !== context.user?._id ? "none" : "block"}
@@ -251,8 +238,7 @@ export const ProfileModal = ({ isOpen, onClose, user, setuser }) => {
               Edit
             </Button>
           )}
-          {/* Cancel button */}
-          {editing && <Button onClick={() => setEditing(false)}>Cancel</Button>}
+          {editing && <Button onClick={() => setEditing(false)}>Back</Button>}
         </ModalFooter>
       </ModalContent>
     </Modal>

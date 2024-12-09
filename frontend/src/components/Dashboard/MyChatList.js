@@ -45,28 +45,46 @@ const MyChatList = (props) => {
   var sound = new Audio(wavFile);
   const toast = useToast();
   const context = useContext(chatContext);
-  const socket = context.socket;
+  const {
+    hostName,
+    user,
+    socket,
+    myChatList: chatlist,
+    originalChatList: data,
+    activeChatId,
+    setActiveChatId,
+    setMyChatList,
+    setIsChatLoading,
+    setMessageList,
+    setIsOtherUserTyping,
+    setReceiver,
+    isLoading,
+    isOtherUserTyping,
+  } = context;
   const { isOpen, onOpen, onClose } = useDisclosure();
 
   useEffect(() => {
-    socket.on("new-message", async (data) => {
-      var newlist = context.mychatList;
-
-      console.log("data", data);
-      console.log("mylist", newlist);
+    socket.on("new-message-notification", async (data) => {
+      var newlist = chatlist;
 
       let chatIndex = newlist.findIndex(
         (chat) => chat._id === data.conversationId
       );
-      // context.setactiveChat(data.conversationId);
       if (chatIndex === -1) {
         newlist.unshift(data.conversation);
       }
       chatIndex = newlist.findIndex((chat) => chat._id === data.conversationId);
       newlist[chatIndex].latestmessage = data.text;
 
-      if (context.activeChat !== data.conversationId) {
-        newlist[chatIndex].unread[0]++;
+      if (activeChatId !== data.conversationId) {
+        newlist[chatIndex].unreadCounts = newlist[chatIndex].unreadCounts.map(
+          (unread) => {
+            if (unread.userId === user._id) {
+              unread.count = unread.count + 1;
+            }
+            return unread;
+          }
+        );
         newlist[chatIndex].updatedAt = new Date();
       }
 
@@ -74,18 +92,18 @@ const MyChatList = (props) => {
       let updatedChat = newlist.splice(chatIndex, 1)[0];
       newlist.unshift(updatedChat);
 
-      context.setmychatList([...newlist]); // Create a new array to update state
+      setMyChatList([...newlist]); // Create a new array to update state
 
       //find the name of person who sent the message
       let sender = newlist.find((chat) => chat._id === data.conversationId)
         .members[0];
 
-      context.activeChat !== data.conversationId &&
+      activeChatId !== data.conversationId &&
         sound.play().catch((error) => {
           console.log(error);
         });
 
-      context.activeChat !== data.conversationId &&
+      activeChatId !== data.conversationId &&
         toast({
           // title: "New Message",
           // description: data.text,
@@ -104,84 +122,74 @@ const MyChatList = (props) => {
     });
 
     return () => {
-      socket.off("new-message");
+      socket.off("new-message-notification");
     };
   });
 
   const [squery, setsquery] = useState("");
 
-  var chatlist = context.mychatList;
-  var data = context.originalChatList;
-
   const handleUserSearch = async (e) => {
     if (e.target.value !== "") {
-      setsquery(await e.target.value);
-      const newchatlist = data.filter((chat) => {
-        if (
-          chat.members[0].name
-            .toLowerCase()
-            .includes(e.target.value.toLowerCase())
-        ) {
-          return chat;
-        }
-      });
-      context.setmychatList(newchatlist);
+      setsquery(e.target.value.toLowerCase());
+      const newchatlist = data.filter((chat) =>
+        chat.members[0].name.toLowerCase().includes(squery)
+      );
+      setMyChatList(newchatlist);
     } else {
-      context.setmychatList(context.originalChatList);
+      setMyChatList(context.originalChatList);
     }
   };
 
   const handleChatOpen = async (chatid, receiver) => {
     try {
-      context.setischatLoading(true);
-      context.setmessageList([]);
-      context.setotherusertyping(false);
-      context.setotheruseronline(false);
+      setIsChatLoading(true);
+      setMessageList([]);
+      setIsOtherUserTyping(false);
       const msg = document.getElementById("new-message");
       if (msg) {
         document.getElementById("new-message").value = "";
         document.getElementById("new-message").focus();
       }
 
-      context.setotherusertyping(false);
+      setIsOtherUserTyping(false);
       await socket.emit("stop-typing", {
-        typer: context.user._id,
-        conversationId: context.activeChat,
+        typer: user._id,
+        conversationId: activeChatId,
       });
-      await socket.emit("leave-chat", context.activeChat);
+      await socket.emit("leave-chat", activeChatId);
 
-      socket.emit("join-chat", { room: chatid, user: context.user._id });
-      context.setactiveChat(chatid);
+      socket.emit("join-chat", { roomId: chatid, userId: user._id });
+      setActiveChatId(chatid);
 
-      const response = await fetch(
-        `${context.ipadd}/message/${chatid}/${context.user._id}`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            "auth-token": localStorage.getItem("token"),
-          },
-        }
-      );
+      const response = await fetch(`${hostName}/message/${chatid}/${user._id}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          "auth-token": localStorage.getItem("token"),
+        },
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch data");
       }
       const jsonData = await response.json();
 
-      context.setmessageList(jsonData);
-      // context.setactiveChat(chatid);
-      context.setreceiver(receiver);
+      setMessageList(jsonData);
+      setReceiver(receiver);
+      setIsChatLoading(false);
 
-      context.setischatLoading(false);
-
-      const newlist = context.mychatList.map((chat) => {
+      const newlist = chatlist.map((chat) => {
         if (chat._id === chatid) {
-          chat.unread[0] = 0;
+          chat.unreadCounts = chat.unreadCounts.map((unread) => {
+            if (unread.userId === user._id) {
+              unread.count = 0;
+            }
+            return unread;
+          });
         }
         return chat;
       });
 
-      context.setmychatList(newlist);
+      setMyChatList(newlist);
 
       setTimeout(() => {
         document.getElementById("chat-box")?.scrollTo({
@@ -194,7 +202,7 @@ const MyChatList = (props) => {
     }
   };
 
-  return !context.loading ? (
+  return !isLoading ? (
     <>
       <Box
         display={"flex"}
@@ -223,7 +231,7 @@ const MyChatList = (props) => {
 
             <Box minW={"fit-content"} display={{ base: "block", md: "none" }}>
               <ProfileMenu
-                context={context}
+                user={user}
                 isOpen={isOpen}
                 onOpen={onOpen}
                 onClose={onClose}
@@ -257,9 +265,7 @@ const MyChatList = (props) => {
                 w={"100%"}
                 justifyContent={"space-between"}
                 onClick={() => handleChatOpen(chat._id, chat.members[0])}
-                colorScheme={
-                  chat._id === context.activeChat ? "purple" : "gray"
-                }
+                colorScheme={chat._id === activeChatId ? "purple" : "gray"}
               >
                 <Flex>
                   <Box>
@@ -286,8 +292,7 @@ const MyChatList = (props) => {
                         ? chat.members[0].name?.substring(0, 13) + "..."
                         : chat.members[0].name}
                     </Text>
-                    {context.otherusertyping &&
-                    chat._id === context.activeChat ? (
+                    {isOtherUserTyping && chat._id === activeChatId ? (
                       <Text fontSize={"sm"} color={"purple.100"}>
                         typing...
                       </Text>
@@ -301,7 +306,7 @@ const MyChatList = (props) => {
                 </Flex>
 
                 <Stack direction={"row"} align={"center"}>
-                  <Text textAlign={"right"} fontSize={"x-small"}>
+                  <Box textAlign={"right"} fontSize={"x-small"}>
                     {new Date(chat.updatedAt).toDateString() ===
                     new Date().toDateString() ? (
                       <Text mb={1} fontSize={"x-small"}>
@@ -323,9 +328,11 @@ const MyChatList = (props) => {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
-                  </Text>
+                  </Box>
 
-                  {chat.unread[0] > 0 && (
+                  {chat.unreadCounts.find(
+                    (unread) => unread.userId === user._id
+                  )?.count > 0 && (
                     <Circle
                       backgroundColor={"black"}
                       color={"white"}
@@ -334,7 +341,13 @@ const MyChatList = (props) => {
                       size={"20px"}
                     >
                       <Text fontSize={12} p={1} borderRadius={50}>
-                        &nbsp; {chat.unread[0]} &nbsp;
+                        &nbsp;
+                        {
+                          chat.unreadCounts.find(
+                            (unread) => unread.userId === user._id
+                          )?.count
+                        }
+                        &nbsp;
                       </Text>
                     </Circle>
                   )}
@@ -347,7 +360,7 @@ const MyChatList = (props) => {
           isOpen={isOpen}
           onClose={onClose}
           onOpen={onOpen}
-          user={context.user}
+          user={user}
         />
       </Box>
     </>

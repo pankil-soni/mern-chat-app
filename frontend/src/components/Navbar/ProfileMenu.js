@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useContext } from "react";
 import {
   Button,
   Text,
@@ -12,38 +12,37 @@ import { ChevronDownIcon } from "@chakra-ui/icons";
 import { useNavigate } from "react-router-dom";
 import { ProfileModal } from "../miscellaneous/ProfileModal";
 import { useColorMode } from "@chakra-ui/react";
+import chatContext from "../../context/chatContext";
 
 const ProfileMenu = (props) => {
-  // Accessing color mode and toggle function from Chakra UI
-  const { colorMode, toggleColorMode } = useColorMode();
-
-  // Using React Router's navigate hook
+  const { toggleColorMode } = useColorMode();
+  const context = useContext(chatContext);
+  const {
+    user,
+    setUser,
+    setIsAuthenticated,
+    setActiveChatId,
+    setMessageList,
+    setReceiver,
+  } = context;
   const navigator = useNavigate();
 
-  // Extracting user data from props
-  const user = props.context.user;
-
-  // Function to handle logout
   const handleLogout = async (e) => {
     e.preventDefault();
-    // Clear user authentication and data
-    props.context.setisauthenticated(false);
-    props.context.setuser({});
-    props.context.setmessageList([]);
-    props.context.setactiveChat("");
-    props.context.setreceiver({});
+    setUser({});
+    setMessageList([]);
+    setActiveChatId("");
+    setReceiver({});
     localStorage.removeItem("user");
     localStorage.removeItem("token");
-    // Redirect to home page
+    setIsAuthenticated(false);
+    console.log("logout");
     navigator("/");
   };
-
   return (
     <>
-      {/* Profile Menu */}
       <Menu>
         {
-          // Display user profile button
           <>
             <MenuButton
               isActive={props.isOpen}
@@ -68,11 +67,8 @@ const ProfileMenu = (props) => {
                 {user.name}
               </Text>
             </MenuButton>
-            {/* Dropdown Menu List */}
             <MenuList>
-              {/* Menu Item to open profile modal */}
-              <MenuItem onClick={props.onOpen}>My Profile</MenuItem>
-              {/* Menu Item to toggle color mode */}
+              <MenuItem onClick={props.onOpen}>MyProfile</MenuItem>
               <MenuItem
                 display={{
                   base: "block",
@@ -80,12 +76,10 @@ const ProfileMenu = (props) => {
                 }}
                 onClick={toggleColorMode}
               >
-                {/* Display light or dark mode based on current mode */}
                 {localStorage.getItem("chakra-ui-color-mode") === "light"
                   ? "Dark Mode"
                   : "Light Mode"}
               </MenuItem>
-              {/* Menu Item to logout */}
               <MenuItem color={"red"} onClick={handleLogout}>
                 Logout
               </MenuItem>
@@ -93,12 +87,11 @@ const ProfileMenu = (props) => {
           </>
         }
       </Menu>
-      {/* Profile Modal */}
       <ProfileModal
         isOpen={props.isOpen}
         onClose={props.onClose}
-        user={props.context.user}
-        setuser={props.context.setuser}
+        user={user}
+        setUser={setUser}
       />
     </>
   );

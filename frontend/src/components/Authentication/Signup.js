@@ -1,5 +1,5 @@
 import chatContext from "../../context/chatContext";
-import { useState, useContext, useRef } from "react";
+import { useState, useContext } from "react";
 import {
   Flex,
   Heading,
@@ -16,23 +16,20 @@ import {
   Card,
   CardBody,
   useToast,
-  Text,
 } from "@chakra-ui/react";
 import { LockIcon } from "@chakra-ui/icons";
 
 const Signup = (props) => {
   const context = useContext(chatContext);
-  const fileInputRef = useRef(null);
+  const {hostName} = context
   const toast = useToast();
 
   const [showPassword, setShowPassword] = useState(false);
 
   const [name, setname] = useState("");
   const [email, setemail] = useState("");
-  const [phoneNum, setphoneNum] = useState("");
   const [password, setpassword] = useState("");
   const [confirmpassword, setconfirmpassword] = useState("");
-  const [profilePic, setprofilePic] = useState(null);
 
   const handletabs = props.handleTabsChange;
 
@@ -46,17 +43,12 @@ const Signup = (props) => {
     });
   }
 
-  const handleChooseFile = () => {
-    fileInputRef.current.click();
-    setprofilePic(fileInputRef.current.files[0]);
-  };
-
   const handleShowClick = () => setShowPassword(!showPassword);
 
   const handleSignup = async (e) => {
     e.preventDefault();
 
-    if (email === "" || name === "" || phoneNum === "" || password === "") {
+    if (email === "" || name === "" || password === "") {
       showtoast("All fields are required");
       return;
     } else if (name.length > 20 || name.length < 3) {
@@ -68,9 +60,6 @@ const Signup = (props) => {
     } else if (email.length > 50) {
       showtoast("Email should be atmost 50 characters long");
       return;
-    } else if (phoneNum.length !== 10) {
-      showtoast("Invalid phone number");
-      return;
     } else if (password.length < 8 || password.length > 20) {
       showtoast("Invalid Password");
       return;
@@ -78,17 +67,19 @@ const Signup = (props) => {
       showtoast("Passwords do not match");
       return;
     } else {
-      const formData = new FormData();
-      formData.append("profilePic", profilePic);
-      formData.append("email", email);
-      formData.append("name", name);
-      formData.append("phoneNum", phoneNum);
-      formData.append("password", password);
+      const payload = {
+        email,
+        name,
+        password,
+      };
 
       toast.promise(
-        fetch(`${context.ipadd}/user/register`, {
+        fetch(`${hostName}/auth/register`, {
           method: "POST",
-          body: formData,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         })
           .then((response) => {
             if (response.status !== 200) {
@@ -175,21 +166,6 @@ const Signup = (props) => {
                     borderStartRadius={"10px"}
                     size={"lg"}
                   >
-                    <Input
-                      type="number"
-                      placeholder="Phone Number"
-                      focusBorderColor="purple.500"
-                      onChange={(e) => setphoneNum(e.target.value)}
-                    />
-                  </InputGroup>
-                </FormControl>
-
-                <FormControl>
-                  <InputGroup
-                    borderEndRadius={"10px"}
-                    borderStartRadius={"10px"}
-                    size={"lg"}
-                  >
                     <InputLeftElement
                       pointerEvents="none"
                       color="gray.300"
@@ -240,51 +216,6 @@ const Signup = (props) => {
                       </Button>
                     </InputRightElement>
                   </InputGroup>
-
-                  <Flex align="center">
-                    {!profilePic && (
-                      <Text mx={2} fontSize="sm">
-                        Upload Profile Picture
-                      </Text>
-                    )}
-                    {profilePic && (
-                      <Text mx={2} fontSize="sm">
-                        {profilePic.name.length > 30
-                          ? profilePic.name.substring(0, 30) + "..."
-                          : profilePic.name}
-                      </Text>
-                    )}
-                    <Input
-                      display="none"
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={(e) => {
-                        console.log("File selected:", e.target.files[0]);
-                        setprofilePic(e.target.files[0]);
-                      }}
-                    />
-                    {!profilePic && (
-                      <Button
-                        colorScheme="purple"
-                        onClick={handleChooseFile}
-                        borderRadius="10px"
-                        borderWidth={0}
-                      >
-                        <Text mr={2}>Choose File</Text>
-                      </Button>
-                    )}
-                    {profilePic && (
-                      <Button
-                        size={"sm"}
-                        colorScheme="red"
-                        onClick={() => setprofilePic(null)}
-                        borderRadius="10px"
-                        borderWidth={0}
-                      >
-                        <Text>Remove</Text>
-                      </Button>
-                    )}
-                  </Flex>
                 </FormControl>
                 <Button
                   borderRadius={10}

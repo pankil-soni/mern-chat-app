@@ -1,19 +1,20 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { Box, Button, Flex, Text, Link, useDisclosure } from "@chakra-ui/react";
 import { FaGithub, FaMoon, FaSun } from "react-icons/fa";
 import ProfileMenu from "./ProfileMenu";
+import chatContext from "../../context/chatContext";
 
 const Navbar = (props) => {
-  // Hook to manage the state of the disclosure for profile menu
+  const context = useContext(chatContext);
+  const { isAuthenticated } = context;
   const { isOpen, onOpen, onClose } = useDisclosure();
-
-  // State to manage the color mode icon
   const colormode = localStorage.getItem("chakra-ui-color-mode");
   const [icon, seticon] = useState(
     colormode === "dark" ? <FaSun /> : <FaMoon />
   );
 
-  // Function to toggle color mode
+  const path = window.location.pathname;
+
   const handleToggle = () => {
     if (colormode === "dark") {
       seticon(<FaMoon />);
@@ -26,15 +27,16 @@ const Navbar = (props) => {
 
   return (
     <>
-      {/* Navbar for small screens */}
-      {!window.location.pathname.includes("dashboard") && (
+      {!path.includes("dashboard") && (
         <Box
           position={"absolute"}
           top={5}
           left={5}
-          display={{ md: "none", base: "flex" }}
+          display={{
+            md: "none",
+            base: "flex",
+          }}
         >
-          {/* Color mode toggle button */}
           <Button
             p={3}
             borderRadius={"full"}
@@ -46,7 +48,6 @@ const Navbar = (props) => {
           >
             {icon}
           </Button>
-          {/* Github link */}
           <Link
             p={3}
             borderRadius={"full"}
@@ -60,18 +61,18 @@ const Navbar = (props) => {
           </Link>
         </Box>
       )}
-
-      {/* Navbar for larger screens */}
       <Box
         p={3}
         w={{ base: "94vw", md: "99vw" }}
         m={2}
         borderRadius="10px"
         borderWidth="2px"
-        display={{ base: "none", md: "block" }}
+        display={{
+          base: "none",
+          md: "block",
+        }}
       >
         <Flex justify={"space-between"}>
-          {/* Logo */}
           <Text fontSize="2xl">Conversa</Text>
 
           <Box
@@ -79,7 +80,6 @@ const Navbar = (props) => {
             justifyContent="space-between"
             alignItems="center"
           >
-            {/* Color mode toggle button */}
             <Button
               onClick={handleToggle}
               mr={2}
@@ -91,7 +91,6 @@ const Navbar = (props) => {
             >
               {icon}
             </Button>
-            {/* Github link */}
             <Button
               borderRadius={"full"}
               borderWidth={1}
@@ -105,14 +104,8 @@ const Navbar = (props) => {
             >
               <FaGithub />
             </Button>
-            {/* Profile menu */}
-            {localStorage.getItem("token") && (
-              <ProfileMenu
-                context={props.context}
-                isOpen={isOpen}
-                onOpen={onOpen}
-                onClose={onClose}
-              />
+            {isAuthenticated && (
+              <ProfileMenu isOpen={isOpen} onOpen={onOpen} onClose={onClose} />
             )}
           </Box>
         </Flex>

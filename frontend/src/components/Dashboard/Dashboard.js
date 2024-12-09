@@ -16,13 +16,14 @@ import { ChatArea } from "./ChatArea";
 
 const Dashboard = () => {
   const context = useContext(chatContext);
+  const { user, isAuthenticated, activeChatId } = context;
   const navigator = useNavigate();
   const toast = useToast();
 
-  const [isLoading, setisLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!context.isauthenticated) {
+    if (!isAuthenticated) {
       toast({
         title: "You are not logged in",
         description: "Please login to continue",
@@ -34,13 +35,13 @@ const Dashboard = () => {
     }
 
     return () => {};
-  }, []);
+  }, [isAuthenticated]);
 
   setTimeout(async () => {
-    if (!context.isauthenticated) {
+    if (!isAuthenticated) {
       navigator("/");
     } else {
-      setisLoading((await context.user) && false);
+      setIsLoading((await user) && false);
     }
   }, 1000);
 
@@ -107,7 +108,7 @@ const Dashboard = () => {
           <Flex h={"100%"}>
             <Box
               display={{
-                base: context.activeChat !== "" ? "none" : "flex",
+                base: activeChatId !== "" ? "none" : "flex",
                 md: "block",
               }}
               w={{ base: "100%", md: "29vw" }}

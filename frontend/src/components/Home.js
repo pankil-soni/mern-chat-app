@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Flex,
@@ -13,35 +13,29 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import Auth from "./Authentication/Auth";
-import { useContext } from "react";
+import { useContext, useEffect } from "react";
 import chatContext from "../context/chatContext";
 import { Link, useNavigate } from "react-router-dom";
 
 const Home = () => {
-  // Accessing chat context
+  // context
   const context = useContext(chatContext);
-
-  // Using Chakra UI hook for modal
+  const { isAuthenticated } = context;
   const { isOpen, onOpen, onClose } = useDisclosure();
-
-  // State for keeping track of index for login/signup in modal
   const [index, setindex] = useState();
   const navigator = useNavigate();
 
-  // Redirect to dashboard if already authenticated
   useEffect(() => {
-    if (context.isauthenticated) {
+    if (isAuthenticated) {
       navigator("/dashboard");
     }
-  }, [context.isauthenticated, navigator]);
+  });
 
-  // Function to open login modal
   const handleloginopen = () => {
     setindex(0);
     onOpen();
   };
 
-  // Function to open signup modal
   const handlesignupopen = () => {
     setindex(1);
     onOpen();
@@ -81,7 +75,7 @@ const Home = () => {
           </Text>
         </Link>
       </Text>
-      {/* Modal for Login/Signup */}
+      {/* <Auth /> */}
       <Modal
         isOpen={isOpen}
         onClose={onClose}
