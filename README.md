@@ -153,11 +153,13 @@ password: 1234guest
 1. Start the backend server:
     ```
     cd backend
+    npm install
     nodemon ./index.js
     ```
 2. Start the frontend development server:
     ```
     cd frontend
+    npm install
     npm run start
     ```
 3. Open your browser and navigate to http://localhost:3000 to view the application.
