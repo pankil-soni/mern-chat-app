@@ -660,7 +660,7 @@ Install mern-chat-app using one of the following methods:
 
 1. Clone the mern-chat-app repository:
 	```
-	git clone https://github.com/yourusername/mern-chat-app
+	git clone https://github.com/pankil-soni/mern-chat-app
 	```
 
 2. Navigate to the project directory:
